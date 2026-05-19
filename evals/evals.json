@@ -1,0 +1,23 @@
+{
+  "skill_name": "course-prep",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to prepare a 2-day Python basics workshop for complete beginners — people who have never coded before. They're marketing department staff at a mid-size company who want to automate some of their reporting tasks. We'll be using Python 3.12. Please start building the course — just do Milestone 1 (the blueprint) for now.",
+      "expected_output": "A well-structured course blueprint in _blueprint.md with: clear learning objectives appropriate for non-programmers, module breakdown covering Python basics through simple automation, realistic 2-day pacing, verified Python 3.12 references, and marketing-relevant examples. Should pause and ask for approval after presenting the blueprint.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I'm creating a 3-module advanced React course for experienced JavaScript developers. Modules should cover: (1) React Server Components & Next.js App Router, (2) State management patterns (Zustand, Jotai, signals), (3) Performance optimization. Target: 6 hours total. Go through Milestones 1-3 for Module 1 only — I want to see the full output for one module before continuing.",
+      "expected_output": "Blueprint covering all 3 modules with time allocation, then detailed outline for module 1, then full source content for module 1 including: lecture.md with Obsidian-compatible markdown, code samples that reference actual React/Next.js APIs (verified), tasks with real-world exercises, and quiz questions. Should have validation markers and verified URLs. Pauses for approval at each milestone.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Hey, I have a quick one — I need a quiz for my existing SQL course. The quiz should cover JOINs (INNER, LEFT, RIGHT, FULL), subqueries, and GROUP BY with HAVING. About 15 questions, mix of multiple choice and write-the-query. I need both the markdown source and a Moodle GIFT export.",
+      "expected_output": "A quiz.md file with 15 well-crafted SQL questions covering the specified topics, with answers in a separate section. Then a GIFT format export file that Moodle can import. Questions should use realistic table schemas and test understanding, not just syntax recall. SQL syntax should be standard and correct.",
+      "files": []
+    }
+  ]
+}
