@@ -9,7 +9,9 @@ This skill creates complete, professional training courses through a structured,
 
 ## Core Philosophy
 
-Every piece of content must be **traceable and verifiable**. No hallucinated APIs, no invented library methods, no fake URLs. When in doubt, search and confirm. The course creator acts as both author and fact-checker.
+Every piece of content must be **traceable and verifiable**. No hallucinated APIs, no invented library methods, no fake URLs. When in doubt, search and confirm.
+
+**Authoring and reviewing are separate jobs.** The agent that writes a lecture cannot reliably audit it — same-context self-review produces motivated reasoning. This skill delegates every milestone's verification to the [`course-review`](../course-review/SKILL.md) sibling skill, which runs the review in a fresh subagent with no authoring context. See the **Review Gates** section below.
 
 ## Three-Stage Content Pipeline
 
@@ -36,9 +38,56 @@ course-name/
 
 ---
 
+## Review Gates
+
+Every milestone has a **mandatory review gate** before user approval. The gate is run by the [`course-review`](../course-review/SKILL.md) sibling skill, which delegates to a clean-context subagent so the authoring bias does not leak into the verdict.
+
+**Gate flow at each milestone:**
+
+```
+Author the artifact  →  Invoke course-review with the matching target
+                                       │
+                                       ▼
+                     Subagent returns structured verdict
+                                       │
+                  ┌────────────────────┼────────────────────┐
+                  ▼                    ▼                    ▼
+              APPROVE          APPROVE_WITH_CHANGES   REQUEST_CHANGES / BLOCK
+                  │                    │                    │
+                  ▼                    ▼                    ▼
+        Present to user        Present to user        Fix Critical findings,
+        (clean)                with warnings          then re-invoke gate
+                  │                    │                    │
+                  └────────────────────┴────────────────────┘
+                                       ▼
+                              User approval gate
+```
+
+**Rules:**
+
+1. **The review runs before the user sees the artifact for approval.** Do not skip the gate to "save time" — the gate is the difference between a verified deliverable and a confidently-wrong one.
+2. **Critical findings block the milestone.** If `course-review` returns `REQUEST_CHANGES` or `BLOCK`, fix the Critical findings first; then re-invoke the gate before re-presenting.
+3. **Warnings are surfaced to the user, not silently absorbed.** When the verdict is `APPROVE_WITH_CHANGES`, show the user both the artifact and the warning findings so they can decide whether to fix before or after approval.
+4. **Imported sources also get reviewed.** Whenever something lands in `00-raw/` from outside (research notes, third-party docs, transcripts), invoke `course-review` with target `raw-input` before treating it as a reliable input.
+5. **The gate is not optional.** This is a quality contract, not a recommendation. The only valid skip is when the user explicitly opts out for a specific milestone with full understanding ("skip the review for the blueprint, I'll eyeball it myself"). When a gate is skipped, record it in `00-raw/skipped-reviews.md` with the timestamp, the milestone, the artifact path, and the user's stated reason. The next milestone's review brief MUST reference any prior skips and treat the cumulative unreviewed surface as a risk factor — a missed earlier review does not make the later one optional.
+
+**Milestone → review target mapping:**
+
+| Milestone               | `course-review` target(s) to invoke before user approval |
+| ----------------------- | -------------------------------------------------------- |
+| 1 — Blueprint           | `blueprint` (and `raw-input` for the research notes)     |
+| 2 — Module outlines     | `module-outline` per module                              |
+| 3 — Source content      | `module` per completed module                            |
+| 4 — Cross-module review | `course-package`                                         |
+| 5 — Output compilation  | `compiled-output` per delivered format                   |
+
+Each milestone section below lists its specific review-gate invocation in a **Review gate** subsection.
+
+---
+
 ## Milestone-Based Workflow
 
-The skill works through milestones. After completing each milestone, **stop and present results to the user for approval** before moving to the next one. Never rush ahead — the user drives the pace.
+The skill works through milestones. After completing each milestone, **run the review gate, then stop and present results to the user for approval** before moving to the next one. Never rush ahead — the user drives the pace.
 
 ### Milestone 1: Course Blueprint
 
@@ -72,7 +121,9 @@ The skill works through milestones. After completing each milestone, **stop and 
    - Technology stack with exact versions
    - Key references and official docs (verified URLs)
 
-**Approval gate:** Present the blueprint. User reviews module structure, scope, and pacing. Adjust until approved.
+**Review gate:** Before presenting to the user, invoke `course-review` with target `blueprint` (pass `01-source/_blueprint.md` and `00-raw/original-outline.md`). If `00-raw/` also contains imported third-party material, additionally invoke target `raw-input` over those files. Address any Critical findings, then re-run the gate. Once the verdict is `APPROVE` or `APPROVE_WITH_CHANGES`, proceed.
+
+**Approval gate:** Present the blueprint **alongside the course-review verdict**. User reviews module structure, scope, pacing, and review findings. Adjust until approved.
 
 ---
 
@@ -93,7 +144,9 @@ The skill works through milestones. After completing each milestone, **stop and 
 
 3. Cross-check: search official docs to confirm that APIs, methods, and patterns you plan to teach actually exist in the specified version.
 
-**Approval gate:** Present all module outlines. User reviews scope, ordering, and exercise ideas. Adjust until approved.
+**Review gate:** Before presenting to the user, invoke `course-review` with target `module-outline` for each module's outline file. Address any Critical findings, then re-run the gate. Once every outline returns `APPROVE` or `APPROVE_WITH_CHANGES`, proceed.
+
+**Approval gate:** Present all module outlines **alongside their course-review verdicts**. User reviews scope, ordering, exercise ideas, and review findings. Adjust until approved.
 
 ---
 
@@ -149,7 +202,9 @@ This is the largest milestone. Work through it **one module at a time**, present
 - [ ] No placeholder or invented content — everything is real and specific
 - [ ] Teaching sequence is logical — no forward references to unexplained concepts
 
-**Approval gate:** Present each completed module for review. User may request changes before you proceed to the next module.
+**Review gate:** Before presenting each completed module, invoke `course-review` with target `module` (the `module-NN-*/` folder). The subagent will re-run code samples, fetch external URLs, independently answer quiz questions against the answer key, and check pedagogical alignment. Address any Critical findings, then re-run the gate. Optionally, for finer-grained iteration, you may invoke `lecture`, `code`, `task`, or `quiz` targets individually while still authoring — but the `module` target is required before approval.
+
+**Approval gate:** Present each completed module **alongside its course-review verdict**. User may request changes before you proceed to the next module.
 
 ---
 
@@ -178,7 +233,9 @@ This is the largest milestone. Work through it **one module at a time**, present
    - Balanced pacing (no module drastically longer than others without reason)
    - Progressive difficulty curve
 
-**Approval gate:** Present the complete source package. User does a final review of the full course structure.
+**Review gate:** Before presenting, invoke `course-review` with target `course-package` against the full `01-source/` directory. The subagent will check cross-module consistency (terminology, wikilinks, naming), completeness vs the blueprint, and final URL/reference hygiene. Address any Critical findings, then re-run the gate.
+
+**Approval gate:** Present the complete source package **alongside its course-review verdict**. User does a final review of the full course structure.
 
 ---
 
@@ -208,7 +265,9 @@ This milestone is **only executed when the user requests specific outputs**. The
 - Include speaker notes in PPTX from the lecture notes' instructor annotations
 - Moodle outputs must be tested by describing how to import them
 
-**Approval gate:** Present compiled outputs for review. User verifies formatting and completeness.
+**Review gate:** Before presenting, invoke `course-review` with target `compiled-output` for each delivered artifact (`.pptx`, `.pdf`, `.docx`, `.gift.txt`, `.xml`, zipped projects). The subagent will compare each compiled file against its `01-source/` counterpart for content parity, ordering, code block integrity, speaker notes presence, and (for Moodle) answer-key fidelity. Address any Critical findings — usually by re-running the compilation after fixing the source — then re-run the gate.
+
+**Approval gate:** Present compiled outputs **alongside their course-review verdicts**. User verifies formatting and completeness.
 
 ---
 
@@ -281,7 +340,12 @@ When the source changes, dist is rebuilt. When the topic shifts (new library ver
 
 ## Validation Strategy
 
-Validation is not optional — it is built into every step. The goal is zero hallucinations in the final materials.
+Validation has two layers:
+
+1. **Authoring-time self-checks** (the markers and habits below) — catch problems while you write.
+2. **Milestone-gate review** (the [`course-review`](../course-review/SKILL.md) sibling skill) — independent, clean-context audit before any artifact reaches the user. This is mandatory; see the **Review Gates** section earlier in this file.
+
+The goal is zero hallucinations in the final materials. The self-checks below are how you keep noise out of the gate review — they do not replace it.
 
 ### What to Validate
 
@@ -303,7 +367,7 @@ Use these markers in source files to track verification status:
 - `<!-- NEEDS-VERIFICATION: what needs checking -->` — flagged for review
 - `> [!warning] Unverified` — visible callout when something couldn't be confirmed
 
-Before presenting any milestone for approval, search for all `NEEDS-VERIFICATION` markers and resolve them.
+Before invoking the milestone-gate review, search for all `NEEDS-VERIFICATION` markers and resolve them. The gate will flag leftover markers as Warning findings (dimension 11, "Validation Markers Resolved") — better to clean them up first.
 
 ---
 
@@ -343,11 +407,13 @@ When the user asks to create a course, follow this sequence:
 
 1. Create the `00-raw/`, `01-source/`, `02-dist/` scaffold and save the user's brief verbatim into `00-raw/original-outline.md`
 2. Ask what they want to teach (topic, audience, duration, depth)
-3. Research the topic and save findings into `00-raw/research-notes.md`
-4. Present the Course Blueprint (`01-source/_blueprint.md`) → **wait for approval**
-5. Create detailed module outlines → **wait for approval**
-6. Write source content module by module in `01-source/` → **wait for approval after each module**
-7. Cross-module review and supplementary materials in `01-source/` → **wait for approval**
-8. Compile to requested output formats into `02-dist/` → **wait for approval**
+3. Research the topic and save findings into `00-raw/research-notes.md` → **invoke `course-review` with target `raw-input`** before relying on those notes
+4. Present the Course Blueprint (`01-source/_blueprint.md`) → **invoke `course-review` with target `blueprint`** → **wait for user approval**
+5. Create detailed module outlines → **invoke `course-review` with target `module-outline`** per module → **wait for approval**
+6. Write source content module by module in `01-source/` → **invoke `course-review` with target `module`** per module → **wait for approval after each module**
+7. Cross-module review and supplementary materials in `01-source/` → **invoke `course-review` with target `course-package`** → **wait for approval**
+8. Compile to requested output formats into `02-dist/` → **invoke `course-review` with target `compiled-output`** per delivered format → **wait for approval**
 
-If the user already has a partial course or specific materials, adapt — skip completed steps, incorporate existing content, and pick up from wherever they are.
+Every `course-review` call must return `APPROVE` or `APPROVE_WITH_CHANGES` before the artifact is presented to the user. If it returns `REQUEST_CHANGES` or `BLOCK`, fix the Critical findings first and re-run the gate.
+
+If the user already has a partial course or specific materials, adapt — skip completed steps, incorporate existing content, and pick up from wherever they are. The review gate still applies to anything they produced or imported before invoking this skill.

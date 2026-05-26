@@ -45,21 +45,25 @@ course-name/
 
 ## Workflow
 
-The skill works in five milestones, stopping for your approval between each one:
+The skill works in five milestones. Each milestone runs through a **mandatory independent review gate** before it reaches you for approval:
 
-| Milestone | Output |
-|-----------|--------|
-| 1 — Blueprint | Course plan: modules, objectives, audience, tech stack |
-| 2 — Module outlines | Detailed breakdown of topics, exercises, timing per module |
-| 3 — Source content | Lecture notes, code samples, tasks, and quizzes in `01-source/` |
-| 4 — Cross-module review | Course README, references, glossary, consistency pass |
-| 5 — Compile outputs | PPTX / PDF / Moodle / DOCX / XLSX into `02-dist/` |
+| Milestone | Output | Review gate target |
+|-----------|--------|--------------------|
+| 1 — Blueprint | Course plan: modules, objectives, audience, tech stack | `blueprint` |
+| 2 — Module outlines | Detailed breakdown of topics, exercises, timing per module | `module-outline` |
+| 3 — Source content | Lecture notes, code samples, tasks, and quizzes in `01-source/` | `module` |
+| 4 — Cross-module review | Course README, references, glossary, consistency pass | `course-package` |
+| 5 — Compile outputs | PPTX / PDF / Moodle / DOCX / XLSX into `02-dist/` | `compiled-output` |
 
-Claude stops after each milestone and presents results for your review before continuing.
+The review gate is the companion [`course-review`](../course-review/) skill — it spawns a clean-context subagent that has not seen the authoring conversation, so it can audit the artifact without bias. Critical findings must be fixed before the milestone is presented to you. See [course-review/README.md](../course-review/README.md) for details.
+
+After the gate passes, Claude stops and presents results (artifact + review verdict) for your approval before continuing.
 
 ## Core Philosophy
 
 Every fact, API, and URL is verified before it goes into the course. No hallucinated library methods. No invented endpoints. When in doubt, search and confirm — or mark it explicitly as unverified.
+
+Authoring and reviewing are separate jobs. The agent that writes a lecture cannot reliably audit it — same-context self-review produces motivated reasoning. The companion [`course-review`](../course-review/) skill runs every milestone gate in an independent subagent.
 
 ## Folder Structure (Full)
 
